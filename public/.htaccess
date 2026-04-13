@@ -1,0 +1,8 @@
+Options -Indexes
+
+<FilesMatch "^(config\.php|config\.local\.php)$">
+  Require all denied
+</FilesMatch>
+
+php_value upload_max_filesize 20M
+php_value post_max_size 24M
