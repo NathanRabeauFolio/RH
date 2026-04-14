@@ -72,7 +72,7 @@ function with_file_lock(string $lockPath, callable $callback)
 {
     $fh = fopen($lockPath, 'c+');
     if ($fh === false) {
-        throw new RuntimeException('Impossible d’ouvrir le verrou.');
+        throw new RuntimeException('Impossible d\'ouvrir le verrou.');
     }
     try {
         if (!flock($fh, LOCK_EX)) {
@@ -110,11 +110,11 @@ function atomic_write_raw(string $path, string $contents): void
 {
     $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
     if (file_put_contents($tmp, $contents, LOCK_EX) === false) {
-        throw new RuntimeException('Impossible d’écrire les données.');
+        throw new RuntimeException('Impossible d\'écrire les données.');
     }
     if (!rename($tmp, $path)) {
         @unlink($tmp);
-        throw new RuntimeException('Impossible de finaliser l’écriture.');
+        throw new RuntimeException('Impossible de finaliser l\'écriture.');
     }
 }
 
@@ -624,7 +624,7 @@ function upload_bucket(): string
     $bucket = date('Y/m');
     $path = root_path('storage/uploads/' . $bucket);
     if (!is_dir($path) && !mkdir($path, 0775, true) && !is_dir($path)) {
-        throw new RuntimeException('Impossible de créer le dossier d’upload.');
+        throw new RuntimeException('Impossible de créer le dossier d\'upload.');
     }
     return $bucket;
 }
@@ -659,12 +659,12 @@ function store_uploaded_files(array $files): array
             continue;
         }
         if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
-            throw new RuntimeException('Échec de l’upload.');
+            throw new RuntimeException('Échec de l\'upload.');
         }
         $name = sanitize_filename((string) $file['name']);
         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         if (!is_uploaded_file((string) $file['tmp_name'])) {
-            throw new RuntimeException('Fichier d’upload invalide.');
+            throw new RuntimeException('Fichier d\'upload invalide.');
         }
         $bucket = upload_bucket();
         $stored = bin2hex(random_bytes(8)) . ($ext ? '.' . $ext : '');
@@ -1171,7 +1171,12 @@ function notes_total_for_employee(string $employeeId): array
         $ttc += (float) ($row['amount_ttc'] ?? 0);
         $ht += (float) ($row['amount_ht'] ?? 0);
     }
-    return ['ttc' => number_format($ttc, 2, '.', ''), 'ht' => number_format($ht, 2, '.', '')];
+    $tva = $ttc - $ht;
+    return [
+        'ttc' => number_format($ttc, 2, '.', ''),
+        'ht' => number_format($ht, 2, '.', ''),
+        'tva' => number_format($tva, 2, '.', ''),
+    ];
 }
 
 function employee_summary_for_month(string $employeeId, string $month): array
@@ -1721,11 +1726,17 @@ function notes_docx_bundle(string $employeeId): array
             $refs ? implode(' · ', $refs) : '—',
         ];
     }
+    $totals = notes_total_for_employee($employeeId);
     return [
         'table' => [
             'headers' => ['Date', 'Descriptif', 'TTC', 'HT', 'Paiement', 'Justificatif'],
             'rows' => $rows,
             'widths' => [1200, 3600, 1100, 1100, 1200, 2200],
+        ],
+        'summary' => [
+            ['Total TTC', money($totals['ttc'])],
+            ['Total HT', money($totals['ht'])],
+            ['Total TVA', money($totals['tva'])],
         ],
         'appendices' => $appendices,
     ];
