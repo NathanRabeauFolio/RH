@@ -1910,6 +1910,35 @@ function docx_document(array $spec): string
         ]);
     }
 
+    // Optional independent tables for monthly HR reporting only.
+    foreach (($spec['sections'] ?? []) as $section) {
+        $extraTable = $section['table'];
+        $body .= word_single_paragraph((string) $section['title'], [
+            'size' => 28, 'bold' => true, 'color' => '#' . $primary,
+            'page_break_before' => true, 'keep_next' => true, 'space_after' => 140,
+        ]);
+        $body .= word_single_paragraph((string) $section['intro'], ['size' => 20, 'space_after' => 220, 'keep_next' => true]);
+        $extraRows = [];
+        $headerRow = [];
+        foreach ($extraTable['headers'] as $i => $header) {
+            $headerRow[] = ['width' => $extraTable['widths'][$i], 'fill' => '#' . $primary, 'border_color' => '#' . $primary,
+                'paragraphs' => [word_single_paragraph($header, ['size' => 19, 'bold' => true, 'color' => '#ffffff', 'align' => $i === 2 ? 'center' : 'left'])]];
+        }
+        $extraRows[] = $headerRow;
+        foreach ($extraTable['rows'] as $j => $row) {
+            $last = $j === count($extraTable['rows']) - 1;
+            $cells = [];
+            foreach ($row as $i => $value) {
+                $cells[] = ['width' => $extraTable['widths'][$i], 'fill' => $last || $j % 2 ? '#' . $soft : '#ffffff', 'border_color' => '#' . $line,
+                    'paragraphs' => [word_single_paragraph((string) $value, ['size' => 20, 'bold' => $last || $i === 2, 'align' => $i === 2 ? 'center' : 'left', 'space_after' => 25])]];
+            }
+            $extraRows[] = $cells;
+        }
+        $body .= word_table($extraRows, ['width' => 10400, 'border_color' => '#' . $line]);
+        $body .= word_empty_paragraph(180);
+        $body .= word_single_paragraph((string) $section['note'], ['size' => 18, 'color' => '#666666']);
+    }
+
     if ($appendices !== []) {
         [$usableWidthEmu, $usableHeightEmu] = docx_page_content_box_emu();
         $imageMaxWidthEmu = $usableWidthEmu;

@@ -31,6 +31,12 @@
         </label>
         <label class="field span-2"><span>Justificatif (facultatif)</span><input type="file" name="attachment_${i}[]" accept="${attachmentAccept}" capture="environment" multiple></label>
       </div>`,
+    rest_work: () => `
+      <div class="entry-grid rest-work-row" data-repeatable-row>
+        <label class="field"><span>Date travaillée</span><input type="date" name="date[]" required></label>
+        <label class="field"><span>Motif (facultatif)</span><input type="text" name="reason[]" maxlength="200" placeholder="Événement, déplacement…"></label>
+        <button type="button" class="btn btn-ghost rest-work-remove" data-remove-rest-row>Retirer</button>
+      </div>`,
     leave: (i) => `
       <div class="entry-grid leave-row" data-repeatable-row>
         <input type="hidden" name="row_id[]" value="${i}">
@@ -52,7 +58,15 @@
       const container = document.querySelector(`[data-repeatable-container="${kind}"]`);
       if (!container || !templates[kind]) return;
       const index = container.querySelectorAll('[data-repeatable-row]').length;
+      if (kind === 'rest_work' && index >= 100) return;
       container.insertAdjacentHTML('beforeend', templates[kind](index));
+      if (kind === 'rest_work') {
+        const row = container.lastElementChild;
+        const date = row.querySelector('input[type="date"]');
+        date.max = container.dataset.maxDate;
+        row.querySelector('[data-remove-rest-row]').addEventListener('click', () => row.remove());
+        date.focus();
+      }
     });
   });
 })();

@@ -1,5 +1,5 @@
 <?php
-require dirname(__DIR__) . '/app/lib/helpers.php';
+require dirname(__DIR__) . '/app/lib/rest_work.php';
 ensure_storage();
 
 $user = current_user();
@@ -70,7 +70,7 @@ include __DIR__ . '/partials/header.php';
 
   <nav class="mobile-shortcuts no-print" aria-label="Accès direct à vos démarches">
     <p>Accès direct à vos démarches</p>
-    <div><a href="#notes-de-frais">Notes de frais</a><a href="#titres-restaurant">Titres-restaurant</a><a href="#navigo">Navigo</a><a href="#conges">Congés</a><a class="wide" href="#calendrier">Calendrier d’équipe</a></div>
+    <div><a href="#notes-de-frais">Notes de frais</a><a href="#titres-restaurant">Titres-restaurant</a><a href="#navigo">Navigo</a><a href="#jours-repos-travailles">Jours de repos travaillés</a><a href="#conges">Congés</a><a class="wide" href="#calendrier">Calendrier d’équipe</a></div>
   </nav>
   <section id="notes-de-frais" class="section-block task-card">
     <div class="section-title"><div><h2>Notes de frais</h2><p>Déclarez vos dépenses et ajoutez vos justificatifs.</p></div></div>
@@ -169,6 +169,8 @@ include __DIR__ . '/partials/header.php';
   </section>
 
   </div>
+
+  <?php include __DIR__ . '/partials/rest_work_block.php'; ?>
 
   <section id="conges" class="section-block task-card">
     <div class="section-title"><div><h2>Demande de congés</h2><p>Indiquez le type de congés et la période souhaitée.</p></div></div>

@@ -9,6 +9,7 @@ cleanup() {
   rm -rf -- "$tmp"
 }
 trap cleanup EXIT
+trap 'echo "Smoke test failure near line $LINENO" >&2; tail -n 14 "$tmp/server.log" >&2' ERR
 cp -a "$root/app" "$root/public" "$tmp/"
 mkdir "$tmp/sessions"
 php -d session.save_path="$tmp/sessions" -S 127.0.0.1:18765 -t "$tmp/public" >"$tmp/server.log" 2>&1 &
@@ -24,7 +25,7 @@ request() { curl -fsSL --max-time 20 -b "$tmp/employee.cookies" -c "$tmp/employe
 admin_request() { curl -fsSL --max-time 20 -b "$tmp/admin.cookies" -c "$tmp/admin.cookies" "$@"; }
 request -d action=login -d user_id=laura --data-urlencode "password=$(first_name laura)" "$url/index.php" > "$tmp/employee"
 grep -Fq 'Bonjour, Laura' "$tmp/employee"
-for section in notes-de-frais titres-restaurant navigo conges calendrier; do grep -Fq "id=\"$section\"" "$tmp/employee"; done
+for section in notes-de-frais titres-restaurant navigo jours-repos-travailles conges calendrier; do grep -Fq "id=\"$section\"" "$tmp/employee"; done
 request --data-urlencode 'row_id[]=0' --data-urlencode 'row_id[]=1' --data-urlencode 'date[]=2026-11-18' --data-urlencode 'date[]=2026-11-19' --data-urlencode 'description[]=V2bis smoke A' --data-urlencode 'description[]=V2bis smoke B' --data-urlencode 'amount_ttc[]=24' --data-urlencode 'amount_ttc[]=12' --data-urlencode 'amount_ht[]=20' --data-urlencode 'amount_ht[]=10' --data-urlencode 'payment_mode[]=cb' --data-urlencode 'payment_mode[]=cash' "$url/save_expenses.php" > "$tmp/expense"
 grep -Fq 'V2bis smoke A' "$tmp/expense"
 grep -Fq 'V2bis smoke B' "$tmp/expense"
@@ -73,3 +74,58 @@ request "$url/delete.php?type=expenses&id=$exp" > "$tmp/deleted"
 grep -Fq 'Élément supprimé' "$tmp/deleted"
 php -r '$v=json_decode(file_get_contents($argv[1]),true);exit(count($v)===1?0:1);' "$tmp/storage/data/expenses.json"
 echo 'RH smoke: login, batch expenses, ticket update, Navigo, leave, edit/delete, role checks, Word/PDF exports and Laura admin approval OK.'
+
+# Days off worked: retroactive direct declaration, duplicates, edit, ownership, CSRF and monthly export.
+# Dates are intentionally in two months; using historical dates independent of test run date.
+token="$(php -r '$s=file_get_contents($argv[1]);preg_match("/name=\"csrf\" value=\"([a-f0-9]{64})\"/",$s,$m);echo $m[1]??"";' "$tmp/employee")"
+test -n "$token"
+request -d action=save -d "csrf=$token" --data-urlencode 'date[]=2026-10-25' --data-urlencode 'date[]=2026-10-26' --data-urlencode 'date[]=2026-11-01' --data-urlencode 'reason[]=Événement' --data-urlencode 'reason[]=' --data-urlencode 'reason[]=Autre' "$url/rest_work.php" > "$tmp/rest"
+grep -Fq '3 jour(s) de repos travaillé(s) enregistré(s).' "$tmp/rest"
+request -d action=save -d "csrf=$token" --data-urlencode 'date[]=2026-10-25' --data-urlencode 'reason[]=' "$url/rest_work.php" > "$tmp/duplicate"
+grep -Fq 'Date déjà déclarée' "$tmp/duplicate"
+request -d action=save -d "csrf=$token" --data-urlencode 'date[]=2999-01-01' --data-urlencode 'reason[]=' "$url/rest_work.php" > "$tmp/future"
+grep -Fq 'ne peut pas être future' "$tmp/future"
+request -d action=save -d csrf=incorrect --data-urlencode 'date[]=2026-10-24' --data-urlencode 'reason[]=' "$url/rest_work.php" > "$tmp/csrf"
+grep -Fq 'Session expirée' "$tmp/csrf"
+rfile="$tmp/storage/data/rest_work.json"
+rest_id="$(php -r '$r=json_decode(file_get_contents($argv[1]),true);if(count($r)!==3)exit(1);echo $r[0]["id"];' "$rfile")"
+request -d action=update -d "csrf=$token" -d "id=$rest_id" -d date=2026-10-24 --data-urlencode 'reason=Motif corrigé' "$url/rest_work.php?id=$rest_id" > "$tmp/edited_rest"
+grep -Fq 'Motif corrigé' "$tmp/edited_rest"
+# Another staff member cannot modify or delete Laura's record.
+other() { curl -fsSL --max-time 20 -b "$tmp/other.cookies" -c "$tmp/other.cookies" "$@"; }
+other_id="$(php -r '$c=require $argv[1];foreach($c["users"] as $u){if($u["role"]==="employee"&&$u["id"]!=="laura"&&password_verify(strtolower($u["first_name"]),$u["password_hash"])){echo $u["id"];exit;}}exit(1);' "$tmp/app/config.default.php")"
+other -d action=login -d "user_id=$other_id" --data-urlencode "password=$(first_name "$other_id")" "$url/index.php" > "$tmp/other"
+other_token="$(php -r '$s=file_get_contents($argv[1]);preg_match("/name=\"csrf\" value=\"([a-f0-9]{64})\"/",$s,$m);echo $m[1]??"";' "$tmp/other")"
+other -d action=delete -d "csrf=$other_token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/blocked_rest"
+grep -Fq 'Déclaration introuvable' "$tmp/blocked_rest"
+admin_request "$url/export_transport_docx.php?month=2026-10" -o "$tmp/oct.docx"
+unzip -tq "$tmp/oct.docx" >/dev/null
+unzip -p "$tmp/oct.docx" word/document.xml > "$tmp/oct.xml"
+grep -Fq 'Jours de repos travaillés — Octobre 2026' "$tmp/oct.xml"
+grep -Fq 'sans validation administrative' "$tmp/oct.xml"
+grep -Fq 'Samedi 24/10/2026 ; Lundi 26/10/2026' "$tmp/oct.xml"
+! grep -Fq 'Dimanche 01/11/2026' "$tmp/oct.xml"
+admin_request "$url/export_transport_docx.php?month=2026-11" -o "$tmp/nov.docx"
+unzip -p "$tmp/nov.docx" word/document.xml > "$tmp/nov.xml"
+grep -Fq 'Dimanche 01/11/2026' "$tmp/nov.xml"
+! grep -Fq 'Samedi 24/10/2026' "$tmp/nov.xml"
+python3 - "$tmp/oct.xml" "$tmp/nov.xml" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+def cells(row):
+    return ["".join(t.text or "" for t in c.findall(".//w:t", ns)) for c in row.findall("./w:tc", ns)]
+for path, expected in zip(sys.argv[1:], ["2", "1"]):
+    root = ET.parse(path).getroot()
+    candidates = [[cells(row) for row in table.findall("./w:tr", ns)] for table in root.findall(".//w:tbl", ns)]
+    tables = [table for table in candidates if table and "Dates des jours de repos travaillés" in table[0]]
+    assert len(tables) == 1, "Expected one distinct declaration table"
+    rows = {row[0]: row for row in tables[0][1:]}
+    assert rows.get("Laura", ["", "", "missing"])[2] == expected, rows
+    assert rows.get("TOTAL ÉQUIPE", ["", "", "missing"])[2] == expected, rows
+    assert len(rows) == 6, rows
+PY
+request -d action=delete -d "csrf=$token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/deleted_rest"
+grep -Fq 'Déclaration supprimée' "$tmp/deleted_rest"
+php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===2?0:1);' "$rfile"
+echo 'RH: jours de repos déclarés sans validation, édition, suppression, anti-doublon, permissions, CSRF et export mensuel OK.'
