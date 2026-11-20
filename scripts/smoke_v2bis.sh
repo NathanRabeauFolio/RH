@@ -116,7 +116,7 @@ import xml.etree.ElementTree as ET
 ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 def cells(row):
     return ["\n".join("".join(t.text or "" for t in p.findall(".//w:t", ns)) for p in c.findall("./w:p", ns)) for c in row.findall("./w:tc", ns)]
-for path, expected in zip(sys.argv[1:], ["0 jour", "3 jours"]):
+for path, expected in zip(sys.argv[1:], ["0 jours", "3 jours"]):
     root = ET.parse(path).getroot()
     tables = root.findall(".//w:tbl", ns)
     assert len(tables) == 1, "Expected exactly one table in monthly RH Word"
@@ -127,7 +127,7 @@ for path, expected in zip(sys.argv[1:], ["0 jour", "3 jours"]):
     assert len(rows) == 6, rows
     assert rows["Laura"][-1].splitlines()[0] == expected, rows
     assert rows["TOTAL REPOS TRAVAILLÉS"][-1] == expected, rows
-    assert "19" in rows["Laura"] or expected == "0 jour", rows
+    assert "19" in rows["Laura"] or expected == "0 jours", rows
     actual = rows["Laura"][-1]
     for value in ["Samedi 24/10/2026 — Motif corrigé", "Lundi 26/10/2026 — Montage exposition", "Dimanche 01/11/2026 — Autre"]:
         assert (value in actual) == (expected == "3 jours"), actual
