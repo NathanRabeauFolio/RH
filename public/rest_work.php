@@ -8,18 +8,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         rest_work_verify_token((string) ($_POST['csrf'] ?? ''));
         if ($action === 'save') {
             $count = rest_work_save($user['id'], (array) ($_POST['date'] ?? []), (array) ($_POST['reason'] ?? []));
-            flash_set('success', $count . ' jour(s) de repos travaillé(s) enregistré(s).');
+            rest_work_flash_set('success', $count . ' jour(s) de repos travaillé(s) enregistré(s).');
         } elseif ($action === 'update') {
             rest_work_update($user['id'], (string) ($_POST['id'] ?? ''), (string) ($_POST['date'] ?? ''), (string) ($_POST['reason'] ?? ''));
-            flash_set('success', 'Déclaration modifiée.');
+            rest_work_flash_set('success', 'Déclaration modifiée.');
         } elseif ($action === 'delete') {
             rest_work_delete($user['id'], (string) ($_POST['id'] ?? ''));
-            flash_set('success', 'Déclaration supprimée.');
+            rest_work_flash_set('success', 'Déclaration supprimée.');
         } else {
             throw new InvalidArgumentException('Action inconnue.');
         }
     } catch (Throwable $e) {
-        flash_set('error', $e->getMessage());
+        rest_work_flash_set('error', $e->getMessage());
         if ($action === 'update' && $id !== '') redirect('rest_work.php?id=' . urlencode($id));
     }
     redirect('index.php#jours-repos-travailles');
@@ -28,10 +28,10 @@ if ($id === '') redirect('index.php#jours-repos-travailles');
 try {
     $record = rest_work_find($user['id'], $id);
 } catch (Throwable $e) {
-    flash_set('error', 'Déclaration introuvable.');
+    rest_work_flash_set('error', 'Déclaration introuvable.');
     redirect('index.php#jours-repos-travailles');
 }
-$flash = flash_get();
+$flash = rest_work_flash_get();
 $pageTitle = 'Modifier · Jour de repos travaillé';
 $active = 'dashboard';
 include __DIR__ . '/partials/header.php';

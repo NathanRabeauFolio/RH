@@ -67,6 +67,20 @@ function rest_work_verify_token(string $token): void
     if (!hash_equals(rest_work_token(), $token)) throw new RuntimeException('Session expirée. Rechargez la page.');
 }
 
+function rest_work_flash_set(string $type, string $message): void
+{
+    session_start_if_needed();
+    $_SESSION['rest_work_flash'] = ['type' => $type, 'message' => $message];
+}
+
+function rest_work_flash_get(): ?array
+{
+    session_start_if_needed();
+    $flash = $_SESSION['rest_work_flash'] ?? null;
+    unset($_SESSION['rest_work_flash']);
+    return $flash;
+}
+
 function rest_work_save(string $employeeId, array $dates, array $reasons): int
 {
     if (!$dates || count($dates) > 100 || count($dates) !== count($reasons) || !array_is_list($dates) || !array_is_list($reasons)) {

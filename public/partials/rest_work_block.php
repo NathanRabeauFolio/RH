@@ -1,4 +1,5 @@
 <?php
+$restFlash = rest_work_flash_get();
 $restRows = rest_work_for_employee($employee['id']);
 $restMonth = team_calendar_month();
 $restMonthRows = array_values(array_filter($restRows, static fn(array $row): bool => substr($row['date'], 0, 7) === $restMonth));
@@ -7,6 +8,7 @@ $usualRest = array_map(static fn($day): string => $restDays[(int) $day] ?? '', e
 ?>
 <section id="jours-repos-travailles" class="section-block task-card">
   <div class="section-title"><div><h2>Jours de repos travaillés</h2><p>Déclarez les dates exceptionnellement travaillées pendant vos jours de repos.</p></div></div>
+  <?php if ($restFlash): ?><div class="alert <?= h($restFlash['type']) ?>" role="<?= $restFlash['type'] === 'error' ? 'alert' : 'status' ?>"><?= h($restFlash['message']) ?></div><?php endif; ?>
   <div class="rest-work-info"><p>Vos jours habituels de repos : <strong><?= h(implode(' et ', $usualRest)) ?></strong>.</p><p>Vos déclarations sont directement reprises dans le document RH du mois concerné, sans validation administrative.</p></div>
   <form class="panel" method="post" action="rest_work.php">
     <input type="hidden" name="csrf" value="<?= h(rest_work_token()) ?>">
