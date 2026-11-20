@@ -1,14 +1,11 @@
-name: Deploy to Lightsail
-
+name: Deploy RH to Lightsail
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 concurrency:
   group: production-deploy
   cancel-in-progress: false
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -17,14 +14,13 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-
-      - name: Lint PHP before deploy
-        run: find app public -name '*.php' -print0 | xargs -0 -n1 php -l
-
-      - name: Build release archive
+      - name: Verify release
         run: |
-          tar --exclude='.git' --exclude='.github' --exclude='storage' --exclude='config.local.php' --exclude='docker' --exclude='docs/screenshots' -czf "$RUNNER_TEMP/release.tar.gz" .
-
+          find app public scripts -name '*.php' -print0 | xargs -0 -n1 php -l
+          php public/health.php
+          php scripts/check_v2bis.php
+          node --check public/assets/js/app.js
+          bash -n deploy/deploy_rh_live.sh
       - name: Configure SSH
         env:
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY || secrets.LIGHTSAIL_SSH_KEY }}
@@ -37,30 +33,11 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-
-      - name: Upload archive to Lightsail
+      - name: Deploy to verified RH checkout
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST || secrets.LIGHTSAIL_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER || secrets.LIGHTSAIL_USER }}
-        run: |
-          scp -P "${DEPLOY_PORT:-22}" "$RUNNER_TEMP/release.tar.gz" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/mak-galerie-admin-tool-${GITHUB_SHA}.tar.gz"
-
-      - name: Run remote deployment
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST || secrets.LIGHTSAIL_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER || secrets.LIGHTSAIL_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || secrets.LIGHTSAIL_APP_PATH }}
         run: |
-          ssh -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST"             "APP_ROOT='$DEPLOY_PATH' RELEASE_ARCHIVE='/tmp/mak-galerie-admin-tool-${GITHUB_SHA}.tar.gz' RELEASE_SHA='${GITHUB_SHA}' bash -s"             < deploy/deploy_release.sh
-
-      - name: Post-deploy health check
-        env:
-          APP_HEALTHCHECK_URL: ${{ secrets.APP_HEALTHCHECK_URL }}
-        run: |
-          if [ -n "$APP_HEALTHCHECK_URL" ]; then
-            curl --fail --silent --show-error "$APP_HEALTHCHECK_URL"
-          else
-            echo "Health check URL not configured; remote release verification completed."
-          fi
+          test -n "$DEPLOY_HOST" && test -n "$DEPLOY_USER"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=15 -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST" "RELEASE_SHA='$GITHUB_SHA' bash -s" < deploy/deploy_rh_live.sh
