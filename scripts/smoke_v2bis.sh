@@ -9,6 +9,7 @@ cleanup() {
   rm -rf -- "$tmp"
 }
 trap cleanup EXIT
+trap 'echo "Smoke test failure near line $LINENO" >&2; tail -n 14 "$tmp/server.log" >&2' ERR
 cp -a "$root/app" "$root/public" "$tmp/"
 mkdir "$tmp/sessions"
 php -d session.save_path="$tmp/sessions" -S 127.0.0.1:18765 -t "$tmp/public" >"$tmp/server.log" 2>&1 &
@@ -92,7 +93,8 @@ request -d action=update -d "csrf=$token" -d "id=$rest_id" -d date=2026-10-24 --
 grep -Fq 'Motif corrigé' "$tmp/edited_rest"
 # Another staff member cannot modify or delete Laura's record.
 other() { curl -fsSL --max-time 20 -b "$tmp/other.cookies" -c "$tmp/other.cookies" "$@"; }
-other -d action=login -d user_id=nathan-r --data-urlencode "password=$(first_name nathan-r)" "$url/index.php" > "$tmp/other"
+other_id="$(php -r '$c=require $argv[1];foreach($c["users"] as $u){if($u["role"]==="employee"&&$u["id"]!=="laura"&&password_verify(strtolower($u["first_name"]),$u["password_hash"])){echo $u["id"];exit;}}exit(1);' "$tmp/app/config.default.php")"
+other -d action=login -d "user_id=$other_id" --data-urlencode "password=$(first_name "$other_id")" "$url/index.php" > "$tmp/other"
 other_token="$(php -r '$s=file_get_contents($argv[1]);preg_match("/name=\"csrf\" value=\"([a-f0-9]{64})\"/",$s,$m);echo $m[1]??"";' "$tmp/other")"
 other -d action=delete -d "csrf=$other_token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/blocked_rest"
 grep -Fq 'Déclaration introuvable' "$tmp/blocked_rest"
