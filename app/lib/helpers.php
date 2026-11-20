@@ -1867,7 +1867,10 @@ function docx_document(array $spec): string
     }
 
     if ($table !== []) {
-        $body .= word_single_paragraph((string) ($table['title'] ?? 'Détail'), ['size' => 18, 'bold' => true, 'caps' => true, 'tracking' => 55, 'color' => '#' . $primary, 'space_after' => 80]);
+        $tableTitle = (string) ($table['title'] ?? 'Détail');
+        if ($tableTitle !== '') {
+            $body .= word_single_paragraph($tableTitle, ['size' => 18, 'bold' => true, 'caps' => true, 'tracking' => 55, 'color' => '#' . $primary, 'space_after' => 80]);
+        }
         $rowsXml = [];
         $headerRow = [];
         foreach (($table['headers'] ?? []) as $i => $header) {
@@ -1890,7 +1893,10 @@ function docx_document(array $spec): string
                 $lines = is_array($cellValue) ? $cellValue : [['text' => (string) $cellValue]];
                 foreach ($lines as $item) {
                     $paragraphs[] = word_single_paragraph((string) $item['text'], [
-                        'size' => (int) ($table['font_size'] ?? 16), 'align' => $align, 'space_after' => 20,
+                        'size' => (int) ($item['size'] ?? $table['font_size'] ?? 16), 'align' => $align,
+                        'space_after' => (int) ($item['space_after'] ?? 20),
+                        'color' => (string) ($item['color'] ?? '#111111'),
+                        'keep_next' => !empty($item['keep_next']),
                         'bold' => $isTotal || !empty($item['bold']),
                     ]);
                 }
@@ -1900,6 +1906,7 @@ function docx_document(array $spec): string
                     'border_color' => '#' . $line,
                     'paragraphs' => $paragraphs,
                     'align' => $align,
+                    'margins' => $table['cell_margins'] ?? ['top' => 90, 'left' => 120, 'bottom' => 90, 'right' => 120],
                 ];
             }
             $rowsXml[] = $cells;

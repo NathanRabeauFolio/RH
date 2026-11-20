@@ -184,35 +184,64 @@ function rest_work_month_report(string $month): array
 
 function monthly_hr_table(string $month): array
 {
+    // Only the selected RH month is exported; exporting never moves or consumes a declaration.
     $grouped = rest_work_month_report($month);
     $transport = transport_docx_data($month);
-    $rows = [];
-    $total = 0;
-    foreach (employees() as $i => $employee) {
-        $records = $grouped[$employee['id']] ?? [];
-        $count = count($records);
-        $total += $count;
-        $details = [['text' => $count . ' jour' . ($count === 1 ? '' : 's'), 'bold' => true]];
-        foreach ($records as $record) {
-            $date = $record['date'];
-            $label = rest_work_day($date) . ' ' . (new DateTimeImmutable($date))->format('d/m/Y');
-            $reason = trim((string) ($record['reason'] ?? ''));
-            $details[] = ['text' => $label . ' — ' . ($reason === '' ? 'Motif non renseigné' : $reason)];
+    $staff = employees();
+    $hasRestWork = false;
+    foreach ($staff as $employee) {
+        if (!empty($grouped[$employee['id']])) {
+            $hasRestWork = true;
+            break;
         }
-        $original = $transport['rows'][$i];
-        $rows[] = [$original[0], $original[2], $original[3], $original[4], $original[5], $original[6], $details];
     }
-    $rows[] = ['TOTAL REPOS TRAVAILLÉS', '', '', '', '', '', [['text' => $total . ' jour' . ($total === 1 ? '' : 's'), 'bold' => true]]];
+
+    $headers = ['Collaborateur', 'Jours ouvrant droit aux titres', 'Congés posés', 'Retraits', 'Titres restants', 'Navigo'];
+    $widths = [2800, 2000, 1400, 1200, 1600, 1200];
+    if ($hasRestWork) {
+        $headers[] = 'Jours de repos travaillés';
+        $widths = [2700, 1550, 1300, 1050, 1400, 1000, 6000];
+    }
+
+    $rows = [];
+    foreach ($staff as $i => $employee) {
+        $original = $transport['rows'][$i];
+        $row = [[['text' => $original[0], 'bold' => true]], $original[2], $original[3], $original[4], $original[5], $original[6]];
+        if ($hasRestWork) {
+            $records = $grouped[$employee['id']] ?? [];
+            $count = count($records);
+            $details = [];
+            if (!$count) {
+                $details[] = ['text' => '—', 'color' => '#666666'];
+            } else {
+                $details[] = ['text' => $count . ' jour' . ($count === 1 ? '' : 's'), 'bold' => true, 'space_after' => 90, 'keep_next' => true];
+                foreach ($records as $record) {
+                    $date = $record['date'];
+                    $label = rest_work_day($date) . ' ' . (new DateTimeImmutable($date))->format('d/m/Y');
+                    $reason = trim((string) ($record['reason'] ?? ''));
+                    $details[] = ['text' => $label, 'bold' => true, 'size' => 20, 'space_after' => 15, 'keep_next' => $reason !== ''];
+                    if ($reason !== '') {
+                        $details[] = ['text' => $reason, 'size' => 20, 'space_after' => 100];
+                    } else {
+                        $details[count($details) - 1]['space_after'] = 100;
+                    }
+                }
+            }
+            $row[] = $details;
+        }
+        $rows[] = $row;
+    }
+
     return [
-        'headers' => ['Collaborateur', 'Jours ouvrant droit', 'Congés posés', 'Retraits', 'Titres restants', 'Navigo', 'Jours de repos travaillés — dates et motifs'],
-        'widths' => [2650, 1450, 1150, 1000, 1300, 850, 6600],
+        'headers' => $headers,
+        'widths' => $widths,
         'rows' => $rows,
-        'total' => $total,
-        'width' => 15000,
-        'font_size' => 20,
-        'left_columns' => [0, 6],
+        'has_rest_work' => $hasRestWork,
+        'width' => array_sum($widths),
+        'font_size' => $hasRestWork ? 20 : 22,
+        'left_columns' => $hasRestWork ? [0, 6] : [0],
         'repeat_header' => true,
-        'total_row' => true,
-        'title' => 'Récapitulatif par collaborateur',
+        'cell_margins' => ['top' => 160, 'bottom' => 160, 'left' => 130, 'right' => 130],
+        'title' => '',
     ];
 }

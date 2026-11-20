@@ -110,31 +110,48 @@ unzip -p "$tmp/oct.docx" word/document.xml > "$tmp/oct.xml"
 admin_request "$url/export_transport_docx.php?month=2026-11" -o "$tmp/nov.docx"
 unzip -tq "$tmp/nov.docx" >/dev/null
 unzip -p "$tmp/nov.docx" word/document.xml > "$tmp/nov.xml"
-python3 - "$tmp/oct.xml" "$tmp/nov.xml" <<'PY'
+admin_request "$url/export_transport_docx.php?month=2026-12" -o "$tmp/dec.docx"
+unzip -p "$tmp/dec.docx" word/document.xml > "$tmp/dec.xml"
+python3 - "$tmp/oct.xml" "$tmp/nov.xml" "$tmp/dec.xml" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
 ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 def cells(row):
     return ["\n".join("".join(t.text or "" for t in p.findall(".//w:t", ns)) for p in c.findall("./w:p", ns)) for c in row.findall("./w:tc", ns)]
-for path, expected in zip(sys.argv[1:], ["0 jours", "3 jours"]):
+for path, has_rest in zip(sys.argv[1:], [False, True, False]):
     root = ET.parse(path).getroot()
     tables = root.findall(".//w:tbl", ns)
     assert len(tables) == 1, "Expected exactly one table in monthly RH Word"
-    assert root.find(".//w:pgSz", ns).get("{"+ns["w"]+"}orient") == "landscape"
+    orient = root.find(".//w:pgSz", ns).get("{"+ns["w"]+"}orient")
+    assert (orient == "landscape") == has_rest
     data = [cells(row) for row in tables[0].findall("./w:tr", ns)]
-    assert len(data[0]) == 7 and "Jours de repos travaillés — dates et motifs" in data[0], data
+    assert len(data[0]) == (7 if has_rest else 6), data
+    assert ("Jours de repos travaillés" in data[0]) == has_rest, data
     rows = {row[0]: row for row in data[1:]}
-    assert len(rows) == 6, rows
-    assert rows["Laura"][-1].splitlines()[0] == expected, rows
-    assert rows["TOTAL REPOS TRAVAILLÉS"][-1] == expected, rows
-    assert "19" in rows["Laura"] or expected == "0 jours", rows
-    actual = rows["Laura"][-1]
-    for value in ["Samedi 24/10/2026 — Motif corrigé", "Lundi 26/10/2026 — Montage exposition", "Dimanche 01/11/2026 — Autre"]:
-        assert (value in actual) == (expected == "3 jours"), actual
+    assert len(rows) == 5, rows
+    assert all(len(row) == len(data[0]) for row in rows.values()), rows
+    assert "TOTAL REPOS TRAVAILLÉS" not in rows, rows
+    text = " ".join(t.text or "" for t in root.findall(".//w:t", ns))
+    assert "sans validation administrative" not in text
+    assert "Aucune compensation" not in text
+    assert "Total :" not in text
+    for value in ["Samedi 24/10/2026", "Motif corrigé", "Lundi 26/10/2026", "Montage exposition", "Dimanche 01/11/2026", "Autre"]:
+        assert (value in text) == has_rest, (value, text)
+    if has_rest:
+        assert rows["Laura"][-1].splitlines() == ["3 jours", "Samedi 24/10/2026", "Motif corrigé", "Lundi 26/10/2026", "Montage exposition", "Dimanche 01/11/2026", "Autre"], rows
+        assert all(row[-1] == "—" for name, row in rows.items() if name != "Laura"), rows
+        assert "19" in rows["Laura"], rows
 PY
 # Changing a report month moves the existing declaration, not a copy.
 request -d action=update -d "csrf=$token" -d "id=$rest_id" -d date=2026-10-24 -d report_month=2026-10 --data-urlencode 'reason=Motif corrigé' "$url/rest_work.php?id=$rest_id" > "$tmp/move"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===3&&$r[0]["report_month"]==="2026-10"?0:1);' "$rfile"
+admin_request "$url/export_transport_docx.php?month=2026-10" -o "$tmp/oct-moved.docx"
+admin_request "$url/export_transport_docx.php?month=2026-11" -o "$tmp/nov-moved.docx"
+unzip -p "$tmp/oct-moved.docx" word/document.xml > "$tmp/oct-moved.xml"
+unzip -p "$tmp/nov-moved.docx" word/document.xml > "$tmp/nov-moved.xml"
+grep -Fq 'Samedi 24/10/2026' "$tmp/oct-moved.xml"
+if grep -Fq 'Samedi 24/10/2026' "$tmp/nov-moved.xml"; then exit 1; fi
+grep -Fq 'Lundi 26/10/2026' "$tmp/nov-moved.xml"
 request -d action=delete -d "csrf=$token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/deleted_rest"
 grep -Fq 'Déclaration supprimée' "$tmp/deleted_rest"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===2?0:1);' "$rfile"
