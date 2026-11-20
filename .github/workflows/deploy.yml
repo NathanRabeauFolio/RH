@@ -21,6 +21,7 @@ jobs:
           php scripts/check_v2bis.php
           node --check public/assets/js/app.js
           bash -n deploy/deploy_rh_live.sh
+          bash scripts/smoke_v2bis.sh
       - name: Configure SSH
         env:
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY || secrets.LIGHTSAIL_SSH_KEY }}

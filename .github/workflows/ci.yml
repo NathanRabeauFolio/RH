@@ -22,6 +22,8 @@ jobs:
         run: php scripts/check_v2bis.php
       - name: Validate deployment shell syntax and UI JavaScript
         run: |
-          bash -n deploy/deploy_release.sh deploy/deploy_rh_live.sh
+          bash -n deploy/deploy_release.sh
           bash -n deploy/deploy_rh_live.sh
           node --check public/assets/js/app.js
+      - name: Smoke test isolated PHP application (login, saves, roles, exports)
+        run: bash scripts/smoke_v2bis.sh
