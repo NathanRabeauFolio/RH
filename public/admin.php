@@ -35,17 +35,17 @@ include __DIR__ . '/partials/header.php';
 
 <section class="dash-head">
   <div>
-    <h1>Valerie K</h1>
-    <p><?= h($calendar['label']) ?></p>
+    <h1>Administration</h1>
+    <p>Gérez les congés et les documents de l’équipe. · <?= h($calendar['label']) ?></p>
   </div>
   <div class="metric-row">
-    <div class="metric"><span>Demandes</span><strong><?= h((string) count($pending)) ?></strong></div>
+    <div class="metric"><span>Demandes en attente</span><strong><?= h((string) count($pending)) ?></strong></div>
     <div class="metric"><span>Équipe</span><strong><?= h((string) count(employees())) ?></strong></div>
   </div>
 </section>
 
-<section class="section-block">
-  <div class="section-title"><h2>Validation des congés</h2></div>
+<section id="validation" class="section-block admin-validation task-card">
+  <div class="section-title"><div><h2>Validation des congés</h2><p>Traitez les demandes en attente.</p></div></div>
   <div class="record-stack">
     <?php if (!$pending): ?><div class="panel">Aucune demande en attente.</div><?php endif; ?>
     <?php foreach ($pending as $row): ?>
@@ -77,15 +77,15 @@ include __DIR__ . '/partials/header.php';
   </div>
 </section>
 
-<section class="section-block">
-  <div class="section-title"><h2>Calendrier</h2></div>
+<section id="calendrier" class="section-block calendar-section">
+  <div class="section-title"><div><h2>Calendrier d’équipe</h2><p>Consultez les absences de l’équipe.</p></div></div>
   <div class="panel panel-tight">
     <?php include __DIR__ . '/partials/calendar_block.php'; ?>
   </div>
 </section>
 
-<section class="section-block">
-  <div class="section-title"><h2>Exports</h2></div>
+<section id="exports" class="section-block ">
+  <div class="section-title"><div><h2>Exports de documents</h2><p>Téléchargez les documents disponibles.</p></div></div>
   <div class="panel export-grid">
     <?php foreach (employees() as $employee): ?>
       <article class="export-card">
@@ -112,19 +112,20 @@ include __DIR__ . '/partials/header.php';
   </div>
 </section>
 
-<section class="section-block">
-  <div class="section-title"><h2>Historique</h2></div>
+<section id="historique" class="section-block ">
+  <div class="section-title"><div><h2>Historique des congés</h2><p>Consultez et modifiez les demandes.</p></div></div>
   <div class="panel table-panel">
     <table class="table">
-      <thead><tr><th>Employé</th><th>Type</th><th>Période</th><th>Jours</th><th>Statut</th><th></th></tr></thead>
+      <thead><tr><th>Employé</th><th>Type</th><th>Période</th><th>Jours</th><th>Statut</th><th>Actions</th></tr></thead>
       <tbody>
+      <?php if (!all_leaves()): ?><tr><td colspan="6" class="muted-cell">Aucune demande.</td></tr><?php endif; ?>
       <?php foreach (all_leaves() as $row): ?>
         <tr>
-          <td><?= h(employee_name((string) $row['employee_id'])) ?></td>
-          <td><?= h(leave_type_label((string) $row['leave_type'])) ?></td>
-          <td><?= h((string) $row['start_date']) ?> → <?= h((string) $row['end_date']) ?></td>
-          <td><?= h((string) $row['estimated_days']) ?></td>
-          <td><span class="status <?= h(leave_status_class((string) $row['status'])) ?>"><?= h(leave_status_label((string) $row['status'])) ?></span></td>
+          <td data-label="Employé"><?= h(employee_name((string) $row['employee_id'])) ?></td>
+          <td data-label="Type"><?= h(leave_type_label((string) $row['leave_type'])) ?></td>
+          <td data-label="Période"><?= h((string) $row['start_date']) ?> → <?= h((string) $row['end_date']) ?></td>
+          <td data-label="Jours"><?= h((string) $row['estimated_days']) ?></td>
+          <td data-label="Statut"><span class="status <?= h(leave_status_class((string) $row['status'])) ?>"><?= h(leave_status_label((string) $row['status'])) ?></span></td>
           <td class="actions-cell"><a class="mini-link" href="edit.php?type=leaves&id=<?= urlencode((string) $row['id']) ?>">Modifier</a> <a class="mini-link danger" href="delete.php?type=leaves&id=<?= urlencode((string) $row['id']) ?>" onclick="return confirm('Supprimer ?')">Supprimer</a></td>
         </tr>
       <?php endforeach; ?>

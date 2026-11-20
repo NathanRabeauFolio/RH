@@ -40,19 +40,19 @@ $active = ($user['role'] ?? '') === 'admin' ? 'admin' : 'dashboard';
 include __DIR__ . '/partials/header.php';
 ?>
 <?php if ($flash): ?><div class="alert <?= h($flash['type']) ?>"><?= h($flash['message']) ?></div><?php endif; ?>
-<section class="section-block">
-  <div class="section-title"><h1>Modifier</h1></div>
+<section class="section-block edit-section">
+  <div class="section-title"><h1>Modifier</h1><p><?= h(['expenses' => 'Note de frais', 'tickets' => 'Titres-restaurant', 'navigo' => 'Navigo', 'leaves' => 'Congés'][$type]) ?></p></div>
   <form class="panel form-stack" method="post" enctype="multipart/form-data">
     <?php if ($type === 'expenses'): ?>
       <div class="entry-grid">
         <label class="field"><span>Date</span><input type="date" name="date" value="<?= h((string) $record['date']) ?>" required></label>
         <label class="field span-2"><span>Descriptif</span><input type="text" name="description" value="<?= h((string) $record['description']) ?>" required></label>
-        <label class="field"><span>TTC</span><input type="text" name="amount_ttc" value="<?= h((string) $record['amount_ttc']) ?>" required></label>
-        <label class="field"><span>HT</span><input type="text" name="amount_ht" value="<?= h((string) $record['amount_ht']) ?>" required></label>
+        <label class="field"><span>Montant TTC (€)</span><input type="text" name="amount_ttc" value="<?= h((string) $record['amount_ttc']) ?>" required></label>
+        <label class="field"><span>Montant HT (€)</span><input type="text" name="amount_ht" value="<?= h((string) $record['amount_ht']) ?>" required></label>
         <label class="field"><span>Paiement</span>
           <select name="payment_mode"><?php foreach (payment_modes() as $key => $label): ?><option value="<?= h($key) ?>" <?= $key === (string) $record['payment_mode'] ? 'selected' : '' ?>><?= h($label) ?></option><?php endforeach; ?></select>
         </label>
-        <label class="field span-2"><span>Justificatif</span><input type="file" name="attachment_edit[]" accept="<?= h(attachment_accept_attr()) ?>" capture="environment" multiple></label>
+        <label class="field span-2"><span>Justificatif (facultatif)</span><input type="file" name="attachment_edit[]" accept="<?= h(attachment_accept_attr()) ?>" capture="environment" multiple></label>
       </div>
       <?php if (!empty($record['attachments'])): ?>
         <div class="attachment-list">

@@ -1,4 +1,4 @@
-# MAK Galerie — V10.2
+# MAK Galerie — V10.2 · Interface V2 bis
 
 Application interne PHP, GitHub-ready, pour :
 
@@ -17,6 +17,7 @@ Application interne PHP, GitHub-ready, pour :
 - Raphaele Skupien — mot de passe temporaire : `raphaele`
 - Pauline Lepreux — mot de passe temporaire : `pauline`
 - Olivier Pasquier — mot de passe temporaire : `olivier`
+- Laura — mot de passe temporaire selon la même convention (à remplacer dès que possible).
 
 Les mots de passe sont hachés dans `app/config.default.php`.
 

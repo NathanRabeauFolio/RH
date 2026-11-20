@@ -4,8 +4,9 @@
     const hidden = document.querySelector('[data-user-input]');
     picker.querySelectorAll('[data-user-id]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        picker.querySelectorAll('[data-user-id]').forEach((el) => el.classList.remove('is-selected'));
+        picker.querySelectorAll('[data-user-id]').forEach((el) => { el.classList.remove('is-selected'); el.setAttribute('aria-pressed', 'false'); });
         btn.classList.add('is-selected');
+        btn.setAttribute('aria-pressed', 'true');
         hidden.value = btn.dataset.userId || '';
       });
     });
@@ -19,8 +20,8 @@
         <input type="hidden" name="row_id[]" value="${i}">
         <label class="field"><span>Date</span><input type="date" name="date[]" required></label>
         <label class="field span-2"><span>Descriptif</span><input type="text" name="description[]" required></label>
-        <label class="field"><span>TTC</span><input type="text" name="amount_ttc[]" inputmode="decimal" required></label>
-        <label class="field"><span>HT</span><input type="text" name="amount_ht[]" inputmode="decimal" required></label>
+        <label class="field"><span>Montant TTC (€)</span><input type="text" name="amount_ttc[]" inputmode="decimal" required></label>
+        <label class="field"><span>Montant HT (€)</span><input type="text" name="amount_ht[]" inputmode="decimal" required></label>
         <label class="field"><span>Paiement</span>
           <select name="payment_mode[]">
             <option value="cb">CB</option>
@@ -28,20 +29,20 @@
             <option value="transfer">Virement</option>
           </select>
         </label>
-        <label class="field span-2"><span>Justificatif</span><input type="file" name="attachment_${i}[]" accept="${attachmentAccept}" capture="environment" multiple></label>
+        <label class="field span-2"><span>Justificatif (facultatif)</span><input type="file" name="attachment_${i}[]" accept="${attachmentAccept}" capture="environment" multiple></label>
       </div>`,
     leave: (i) => `
       <div class="entry-grid leave-row" data-repeatable-row>
         <input type="hidden" name="row_id[]" value="${i}">
-        <label class="field"><span>Type</span>
+        <label class="field"><span>Type de congés</span>
           <select name="leave_type[]">
             <option value="paid">Congés payés</option>
             <option value="sick">Maladie</option>
             <option value="other">Autres</option>
           </select>
         </label>
-        <label class="field"><span>Début</span><input type="date" name="start_date[]" required></label>
-        <label class="field"><span>Fin</span><input type="date" name="end_date[]" required></label>
+        <label class="field"><span>Date de début</span><input type="date" name="start_date[]" required></label>
+        <label class="field"><span>Date de fin</span><input type="date" name="end_date[]" required></label>
       </div>`
   };
 
