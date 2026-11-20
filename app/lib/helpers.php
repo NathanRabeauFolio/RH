@@ -1403,8 +1403,8 @@ function word_table(array $rows, array $options = []): string
         $tbl .= '<w:tblCellSpacing w:w="' . $cellSpacing . '" w:type="dxa"/>';
     }
     $tbl .= '</w:tblPr>';
-    foreach ($rows as $row) {
-        $tbl .= '<w:tr>';
+    foreach ($rows as $rowIndex => $row) {
+        $tbl .= '<w:tr>' . (!empty($options['repeat_header']) && $rowIndex === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : '');
         foreach ($row as $cell) {
             $tbl .= word_cell((array) ($cell['paragraphs'] ?? []), $cell);
         }
@@ -1867,7 +1867,7 @@ function docx_document(array $spec): string
     }
 
     if ($table !== []) {
-        $body .= word_single_paragraph('Détail', ['size' => 18, 'bold' => true, 'caps' => true, 'tracking' => 55, 'color' => '#' . $primary, 'space_after' => 80]);
+        $body .= word_single_paragraph((string) ($table['title'] ?? 'Détail'), ['size' => 18, 'bold' => true, 'caps' => true, 'tracking' => 55, 'color' => '#' . $primary, 'space_after' => 80]);
         $rowsXml = [];
         $headerRow = [];
         foreach (($table['headers'] ?? []) as $i => $header) {
@@ -1875,26 +1875,36 @@ function docx_document(array $spec): string
                 'width' => (int) (($table['widths'][$i] ?? 1600)),
                 'fill' => '#' . $primary,
                 'border_color' => '#' . $primary,
-                'paragraphs' => [word_single_paragraph((string) $header, ['size' => 16, 'bold' => true, 'color' => '#ffffff', 'align' => 'center', 'space_after' => 10])],
+                'paragraphs' => [word_single_paragraph((string) $header, ['size' => (int) ($table['font_size'] ?? 16), 'bold' => true, 'color' => '#ffffff', 'align' => 'center', 'space_after' => 10])],
                 'align' => 'center',
             ];
         }
         $rowsXml[] = $headerRow;
         foreach (($table['rows'] ?? []) as $rowIndex => $row) {
-            $fill = $rowIndex % 2 === 0 ? '#ffffff' : '#' . $soft;
+            $isTotal = !empty($table['total_row']) && $rowIndex === count($table['rows']) - 1;
+            $fill = $isTotal || $rowIndex % 2 !== 0 ? '#' . $soft : '#ffffff';
             $cells = [];
             foreach ((array) $row as $i => $cellValue) {
+                $align = in_array($i, $table['left_columns'] ?? [1], true) ? 'left' : 'center';
+                $paragraphs = [];
+                $lines = is_array($cellValue) ? $cellValue : [['text' => (string) $cellValue]];
+                foreach ($lines as $item) {
+                    $paragraphs[] = word_single_paragraph((string) $item['text'], [
+                        'size' => (int) ($table['font_size'] ?? 16), 'align' => $align, 'space_after' => 20,
+                        'bold' => $isTotal || !empty($item['bold']),
+                    ]);
+                }
                 $cells[] = [
                     'width' => (int) (($table['widths'][$i] ?? 1600)),
                     'fill' => $fill,
                     'border_color' => '#' . $line,
-                    'paragraphs' => [word_single_paragraph((string) $cellValue, ['size' => 16, 'align' => $i === 1 ? 'left' : 'center', 'space_after' => 20])],
-                    'align' => $i === 1 ? 'left' : 'center',
+                    'paragraphs' => $paragraphs,
+                    'align' => $align,
                 ];
             }
             $rowsXml[] = $cells;
         }
-        $body .= word_table($rowsXml, ['width' => 10400, 'border_color' => '#' . $line]);
+        $body .= word_table($rowsXml, ['width' => (int) ($table['width'] ?? 10400), 'border_color' => '#' . $line, 'repeat_header' => !empty($table['repeat_header'])]);
         $body .= word_empty_paragraph(180);
     }
 
@@ -2050,7 +2060,7 @@ function docx_document(array $spec): string
         . 'xmlns:wne="http://schemas.microsoft.com/office/2006/wordml" '
         . 'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" mc:Ignorable="w14 wp14">'
         . '<w:body>' . $body
-        . '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="900" w:right="820" w:bottom="900" w:left="820" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr>'
+        . '<w:sectPr>' . (!empty($spec['landscape']) ? '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>' : '<w:pgSz w:w="11906" w:h="16838"/>') . '<w:pgMar w:top="900" w:right="820" w:bottom="900" w:left="820" w:header="500" w:footer="500" w:gutter="0"/></w:sectPr>'
         . '</w:body></w:document>';
 
     $contentTypes = '<?xml version="1.0" encoding="UTF-8"?>'

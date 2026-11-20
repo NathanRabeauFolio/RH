@@ -81,26 +81,48 @@ function rest_work_flash_get(): ?array
     return $flash;
 }
 
-function rest_work_save(string $employeeId, array $dates, array $reasons): int
+// A date worked and the payroll reporting month are distinct facts.
+// Existing declarations have a creation timestamp, so no stored data migration is needed.
+function rest_work_report_month(array $row): string
+{
+    if (!empty($row['report_month'])) return (string) $row['report_month'];
+    if (!empty($row['created_at'])) {
+        $created = new DateTimeImmutable((string) $row['created_at']);
+        return $created->setTimezone(new DateTimeZone((string) app_config()['timezone']))->format('Y-m');
+    }
+    return substr((string) $row['date'], 0, 7);
+}
+
+function rest_work_validate_report_month(string $month, string $date): string
+{
+    if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/D', $month) || $month < substr($date, 0, 7) || $month > date('Y-m')) {
+        throw new InvalidArgumentException('Le mois RH doit être compris entre le mois travaillé et le mois en cours.');
+    }
+    return $month;
+}
+
+function rest_work_save(string $employeeId, array $dates, array $reasons, ?string $reportMonth = null): int
 {
     if (!$dates || count($dates) > 100 || count($dates) !== count($reasons) || !array_is_list($dates) || !array_is_list($reasons)) {
         throw new InvalidArgumentException('Déclarations invalides.');
     }
+    $reportMonth ??= date('Y-m');
     $pending = [];
     foreach ($dates as $i => $value) {
         if (!is_string($value) || !is_string($reasons[$i])) throw new InvalidArgumentException('Déclaration invalide.');
         $date = rest_work_date($value);
+        rest_work_validate_report_month($reportMonth, $date);
         if (isset($pending[$date])) throw new InvalidArgumentException('Date déclarée deux fois : ' . $date);
         $pending[$date] = rest_work_reason($reasons[$i]);
     }
-    return rest_work_mutate(static function (array &$rows) use ($employeeId, $pending): int {
+    return rest_work_mutate(static function (array &$rows) use ($employeeId, $pending, $reportMonth): int {
         foreach ($rows as $row) {
             if ($row['employee_id'] === $employeeId && isset($pending[$row['date']])) {
                 throw new InvalidArgumentException('Date déjà déclarée : ' . $row['date']);
             }
         }
         foreach ($pending as $date => $reason) {
-            $rows[] = ['id' => generate_id('rest'), 'employee_id' => $employeeId, 'date' => $date, 'reason' => $reason,
+            $rows[] = ['id' => generate_id('rest'), 'employee_id' => $employeeId, 'date' => $date, 'reason' => $reason, 'report_month' => $reportMonth,
                 'created_at' => now_iso(), 'updated_at' => now_iso()];
         }
         return count($pending);
@@ -115,11 +137,11 @@ function rest_work_find(string $employeeId, string $id): array
     throw new RuntimeException('Déclaration introuvable.');
 }
 
-function rest_work_update(string $employeeId, string $id, string $date, string $reason): void
+function rest_work_update(string $employeeId, string $id, string $date, string $reason, ?string $reportMonth = null): void
 {
     $date = rest_work_date($date);
     $reason = rest_work_reason($reason);
-    rest_work_mutate(static function (array &$rows) use ($employeeId, $id, $date, $reason): void {
+    rest_work_mutate(static function (array &$rows) use ($employeeId, $id, $date, $reason, $reportMonth): void {
         $index = null;
         foreach ($rows as $i => $row) {
             if ($row['employee_id'] !== $employeeId) continue;
@@ -127,6 +149,8 @@ function rest_work_update(string $employeeId, string $id, string $date, string $
             elseif ($row['date'] === $date) throw new InvalidArgumentException('Date déjà déclarée : ' . $date);
         }
         if ($index === null) throw new RuntimeException('Déclaration introuvable.');
+        $month = rest_work_validate_report_month($reportMonth ?? rest_work_report_month($rows[$index]), $date);
+        $rows[$index]['report_month'] = $month;
         $rows[$index]['date'] = $date;
         $rows[$index]['reason'] = $reason;
         $rows[$index]['updated_at'] = now_iso();
@@ -151,18 +175,44 @@ function rest_work_month_report(string $month): array
     $month = validate_month($month);
     $grouped = [];
     foreach (rest_work_records() as $row) {
-        if (substr($row['date'], 0, 7) === $month) $grouped[$row['employee_id']][$row['date']] = true;
+        if (rest_work_report_month($row) === $month) $grouped[$row['employee_id']][$row['date']] = $row;
     }
+    foreach ($grouped as &$records) ksort($records, SORT_STRING);
+    unset($records);
+    return $grouped;
+}
+
+function monthly_hr_table(string $month): array
+{
+    $grouped = rest_work_month_report($month);
+    $transport = transport_docx_data($month);
     $rows = [];
     $total = 0;
-    foreach (employees() as $employee) {
-        $dates = array_keys($grouped[$employee['id']] ?? []);
-        sort($dates, SORT_STRING);
-        $labels = array_map(static fn(string $date): string => rest_work_day($date) . ' ' . (new DateTimeImmutable($date))->format('d/m/Y'), $dates);
-        $n = count($dates);
-        $total += $n;
-        $rows[] = [$employee['name'], $labels ? implode(' ; ', $labels) : '—', (string) $n];
+    foreach (employees() as $i => $employee) {
+        $records = $grouped[$employee['id']] ?? [];
+        $count = count($records);
+        $total += $count;
+        $details = [['text' => $count . ' jour' . ($count === 1 ? '' : 's'), 'bold' => true]];
+        foreach ($records as $record) {
+            $date = $record['date'];
+            $label = rest_work_day($date) . ' ' . (new DateTimeImmutable($date))->format('d/m/Y');
+            $reason = trim((string) ($record['reason'] ?? ''));
+            $details[] = ['text' => $label . ' — ' . ($reason === '' ? 'Motif non renseigné' : $reason)];
+        }
+        $original = $transport['rows'][$i];
+        $rows[] = [$original[0], $original[2], $original[3], $original[4], $original[5], $original[6], $details];
     }
-    $rows[] = ['TOTAL ÉQUIPE', '', (string) $total];
-    return ['headers' => ['Collaborateur', 'Dates des jours de repos travaillés', 'Nombre de jours'], 'widths' => [2700, 5800, 1900], 'rows' => $rows, 'total' => $total];
+    $rows[] = ['TOTAL REPOS TRAVAILLÉS', '', '', '', '', '', [['text' => $total . ' jour' . ($total === 1 ? '' : 's'), 'bold' => true]]];
+    return [
+        'headers' => ['Collaborateur', 'Jours ouvrant droit', 'Congés posés', 'Retraits', 'Titres restants', 'Navigo', 'Jours de repos travaillés — dates et motifs'],
+        'widths' => [2650, 1450, 1150, 1000, 1300, 850, 6600],
+        'rows' => $rows,
+        'total' => $total,
+        'width' => 15000,
+        'font_size' => 20,
+        'left_columns' => [0, 6],
+        'repeat_header' => true,
+        'total_row' => true,
+        'title' => 'Récapitulatif par collaborateur',
+    ];
 }

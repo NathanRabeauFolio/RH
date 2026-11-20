@@ -79,7 +79,7 @@ echo 'RH smoke: login, batch expenses, ticket update, Navigo, leave, edit/delete
 # Dates are intentionally in two months; using historical dates independent of test run date.
 token="$(php -r '$s=file_get_contents($argv[1]);preg_match("/name=\"csrf\" value=\"([a-f0-9]{64})\"/",$s,$m);echo $m[1]??"";' "$tmp/employee")"
 test -n "$token"
-request -d action=save -d "csrf=$token" --data-urlencode 'date[]=2026-10-25' --data-urlencode 'date[]=2026-10-26' --data-urlencode 'date[]=2026-11-01' --data-urlencode 'reason[]=Événement' --data-urlencode 'reason[]=' --data-urlencode 'reason[]=Autre' "$url/rest_work.php" > "$tmp/rest"
+request -d action=save -d "csrf=$token" -d report_month=2026-11 --data-urlencode 'date[]=2026-10-25' --data-urlencode 'date[]=2026-10-26' --data-urlencode 'date[]=2026-11-01' --data-urlencode 'reason[]=Événement' --data-urlencode 'reason[]=Montage exposition' --data-urlencode 'reason[]=Autre' "$url/rest_work.php" > "$tmp/rest"
 grep -Fq '3 jour(s) de repos travaillé(s) enregistré(s).' "$tmp/rest"
 request -d action=save -d "csrf=$token" --data-urlencode 'date[]=2026-10-25' --data-urlencode 'reason[]=' "$url/rest_work.php" > "$tmp/duplicate"
 grep -Fq 'Date déjà déclarée' "$tmp/duplicate"
@@ -91,6 +91,7 @@ rfile="$tmp/storage/data/rest_work.json"
 rest_id="$(php -r '$r=json_decode(file_get_contents($argv[1]),true);if(count($r)!==3)exit(1);echo $r[0]["id"];' "$rfile")"
 request -d action=update -d "csrf=$token" -d "id=$rest_id" -d date=2026-10-24 --data-urlencode 'reason=Motif corrigé' "$url/rest_work.php?id=$rest_id" > "$tmp/edited_rest"
 grep -Fq 'Motif corrigé' "$tmp/edited_rest"
+grep -Fq 'Novembre 2026' "$tmp/edited_rest"
 # Another staff member cannot modify or delete Laura's record.
 other() { curl -fsSL --max-time 20 -b "$tmp/other.cookies" -c "$tmp/other.cookies" "$@"; }
 other_id="$(php -r '$c=require $argv[1];foreach($c["users"] as $u){if($u["role"]==="employee"&&$u["id"]!=="laura"&&password_verify(strtolower($u["first_name"]),$u["password_hash"])){echo $u["id"];exit;}}exit(1);' "$tmp/app/config.default.php")"
@@ -98,34 +99,43 @@ other -d action=login -d "user_id=$other_id" --data-urlencode "password=$(first_
 other_token="$(php -r '$s=file_get_contents($argv[1]);preg_match("/name=\"csrf\" value=\"([a-f0-9]{64})\"/",$s,$m);echo $m[1]??"";' "$tmp/other")"
 other -d action=delete -d "csrf=$other_token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/blocked_rest"
 grep -Fq 'Déclaration introuvable' "$tmp/blocked_rest"
+# A late declaration belongs to exactly one selected reporting month.
+request -d action=save -d "csrf=$token" -d report_month=2026-09 --data-urlencode 'date[]=2026-10-23' --data-urlencode 'reason[]=' "$url/rest_work.php" > "$tmp/badmonth"
+grep -Fq 'Le mois RH doit être compris' "$tmp/badmonth"
+# Legacy declarations are attributed to their creation month, without modifying stored files.
+php -r '$path=$argv[1];$r=json_decode(file_get_contents($path),true);unset($r[1]["report_month"]);$r[1]["created_at"]="2026-11-20T12:00:00+01:00";file_put_contents($path,json_encode($r));' "$rfile"
 admin_request "$url/export_transport_docx.php?month=2026-10" -o "$tmp/oct.docx"
 unzip -tq "$tmp/oct.docx" >/dev/null
 unzip -p "$tmp/oct.docx" word/document.xml > "$tmp/oct.xml"
-grep -Fq 'Jours de repos travaillés — Octobre 2026' "$tmp/oct.xml"
-grep -Fq 'sans validation administrative' "$tmp/oct.xml"
-grep -Fq 'Samedi 24/10/2026 ; Lundi 26/10/2026' "$tmp/oct.xml"
-! grep -Fq 'Dimanche 01/11/2026' "$tmp/oct.xml"
 admin_request "$url/export_transport_docx.php?month=2026-11" -o "$tmp/nov.docx"
+unzip -tq "$tmp/nov.docx" >/dev/null
 unzip -p "$tmp/nov.docx" word/document.xml > "$tmp/nov.xml"
-grep -Fq 'Dimanche 01/11/2026' "$tmp/nov.xml"
-! grep -Fq 'Samedi 24/10/2026' "$tmp/nov.xml"
 python3 - "$tmp/oct.xml" "$tmp/nov.xml" <<'PY'
 import sys
 import xml.etree.ElementTree as ET
 ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
 def cells(row):
-    return ["".join(t.text or "" for t in c.findall(".//w:t", ns)) for c in row.findall("./w:tc", ns)]
-for path, expected in zip(sys.argv[1:], ["2", "1"]):
+    return ["\n".join("".join(t.text or "" for t in p.findall(".//w:t", ns)) for p in c.findall("./w:p", ns)) for c in row.findall("./w:tc", ns)]
+for path, expected in zip(sys.argv[1:], ["0 jour", "3 jours"]):
     root = ET.parse(path).getroot()
-    candidates = [[cells(row) for row in table.findall("./w:tr", ns)] for table in root.findall(".//w:tbl", ns)]
-    tables = [table for table in candidates if table and "Dates des jours de repos travaillés" in table[0]]
-    assert len(tables) == 1, "Expected one distinct declaration table"
-    rows = {row[0]: row for row in tables[0][1:]}
-    assert rows.get("Laura", ["", "", "missing"])[2] == expected, rows
-    assert rows.get("TOTAL ÉQUIPE", ["", "", "missing"])[2] == expected, rows
+    tables = root.findall(".//w:tbl", ns)
+    assert len(tables) == 1, "Expected exactly one table in monthly RH Word"
+    assert root.find(".//w:pgSz", ns).get("{"+ns["w"]+"}orient") == "landscape"
+    data = [cells(row) for row in tables[0].findall("./w:tr", ns)]
+    assert len(data[0]) == 7 and "Jours de repos travaillés — dates et motifs" in data[0], data
+    rows = {row[0]: row for row in data[1:]}
     assert len(rows) == 6, rows
+    assert rows["Laura"][-1].splitlines()[0] == expected, rows
+    assert rows["TOTAL REPOS TRAVAILLÉS"][-1] == expected, rows
+    assert "19" in rows["Laura"] or expected == "0 jour", rows
+    actual = rows["Laura"][-1]
+    for value in ["Samedi 24/10/2026 — Motif corrigé", "Lundi 26/10/2026 — Montage exposition", "Dimanche 01/11/2026 — Autre"]:
+        assert (value in actual) == (expected == "3 jours"), actual
 PY
+# Changing a report month moves the existing declaration, not a copy.
+request -d action=update -d "csrf=$token" -d "id=$rest_id" -d date=2026-10-24 -d report_month=2026-10 --data-urlencode 'reason=Motif corrigé' "$url/rest_work.php?id=$rest_id" > "$tmp/move"
+php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===3&&$r[0]["report_month"]==="2026-10"?0:1);' "$rfile"
 request -d action=delete -d "csrf=$token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/deleted_rest"
 grep -Fq 'Déclaration supprimée' "$tmp/deleted_rest"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===2?0:1);' "$rfile"
-echo 'RH: jours de repos déclarés sans validation, édition, suppression, anti-doublon, permissions, CSRF et export mensuel OK.'
+echo 'RH: jours de repos déclarés sans validation, édition, suppression, anti-doublon, permissions, CSRF, rattachement RH et tableau Word unique OK.'

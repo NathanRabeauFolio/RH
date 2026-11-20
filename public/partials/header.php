@@ -28,7 +28,7 @@ $navLink = static function (string $label, string $url, string $icon, bool $sele
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title><?= h($pageTitle) ?></title>
   <meta name="theme-color" content="<?= h($config['brand']['primary']) ?>">
-  <link rel="stylesheet" href="assets/css/styles.css?v=2bis-repos1">
+  <link rel="stylesheet" href="assets/css/styles.css?v=2bis-repos2">
 </head>
 <body class="<?= $user ? 'app-auth' : 'app-guest' ?>">
 <a class="skip-link" href="#main-content">Aller au contenu</a>
