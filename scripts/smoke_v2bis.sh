@@ -109,7 +109,22 @@ admin_request "$url/export_transport_docx.php?month=2026-11" -o "$tmp/nov.docx"
 unzip -p "$tmp/nov.docx" word/document.xml > "$tmp/nov.xml"
 grep -Fq 'Dimanche 01/11/2026' "$tmp/nov.xml"
 ! grep -Fq 'Samedi 24/10/2026' "$tmp/nov.xml"
-php -r '$xml=simplexml_load_file($argv[1]); if(!$xml)exit(1);$xml->registerXPathNamespace("w","http://schemas.openxmlformats.org/wordprocessingml/2006/main");$tables=$xml->xpath("//w:tbl");$table=end($tables);$table->registerXPathNamespace("w","http://schemas.openxmlformats.org/wordprocessingml/2006/main");foreach($table->xpath("./w:tr") as $row){$row->registerXPathNamespace("w","http://schemas.openxmlformats.org/wordprocessingml/2006/main");$values=array_map("strval",$row->xpath("./w:tc/w:p/w:r/w:t"));if($values[0]==="Laura"&&$values[2]!=="2")exit(1);if($values[0]==="TOTAL ÉQUIPE"&&end($values)!=="2")exit(1);}' "$tmp/oct.xml"
+python3 - "$tmp/oct.xml" "$tmp/nov.xml" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+def cells(row):
+    return ["".join(t.text or "" for t in c.findall(".//w:t", ns)) for c in row.findall("./w:tc", ns)]
+for path, expected in zip(sys.argv[1:], ["2", "1"]):
+    root = ET.parse(path).getroot()
+    candidates = [[cells(row) for row in table.findall("./w:tr", ns)] for table in root.findall(".//w:tbl", ns)]
+    tables = [table for table in candidates if table and "Dates des jours de repos travaillés" in table[0]]
+    assert len(tables) == 1, "Expected one distinct declaration table"
+    rows = {row[0]: row for row in tables[0][1:]}
+    assert rows.get("Laura", ["", "", "missing"])[2] == expected, rows
+    assert rows.get("TOTAL ÉQUIPE", ["", "", "missing"])[2] == expected, rows
+    assert len(rows) == 6, rows
+PY
 request -d action=delete -d "csrf=$token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/deleted_rest"
 grep -Fq 'Déclaration supprimée' "$tmp/deleted_rest"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===2?0:1);' "$rfile"
