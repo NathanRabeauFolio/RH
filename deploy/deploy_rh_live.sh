@@ -36,11 +36,11 @@ verify_live() {
   grep -Fq 'styles.css?v=2bis' <<<"$html" || return 1
   grep -Fq 'data-user-id="laura"' <<<"$html" || return 1
   health="$(curl --fail --silent --show-error --max-time 15 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/health.php")" || return 1
-  printf '%s' "$health" | php -r '$j=json_decode(stream_get_contents(STDIN), true); exit(($j["status"] ?? "") === "ok" && ($j["users"] ?? 0) === 6 ? 0 : 1);'
+  printf '%s' "$health" | php -r '$j=json_decode(stream_get_contents(STDIN), true); exit(($j["status"] ?? "") === "ok" && ($j["users"] ?? 0) === 6 && isset($j["files"]["rest_work"]) && is_int($j["files"]["rest_work"]) ? 0 : 1);'
 }
 # PHP-FPM may revalidate its opcode cache after a short interval.
 for attempt in 1 2 3 4 5; do
-  if verify_live; then echo "RH release active: $target (HTTPS, V2 bis, Laura, 6 users)"; exit 0; fi
+  if verify_live; then echo "RH release active: $target (HTTPS, V2 bis, Laura, 6 users, jours de repos travaillés)"; exit 0; fi
   sleep 2
 done
 if [[ "$before" != "$target" && "$(git rev-parse HEAD)" == "$target" ]]; then

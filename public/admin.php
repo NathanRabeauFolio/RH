@@ -103,10 +103,10 @@ include __DIR__ . '/partials/header.php';
       </div>
     </article>
     <article class="export-card">
-      <strong>Titres-resto + Navigo</strong>
+      <strong>Déclarations RH mensuelles</strong><p class="export-description">Titres-restaurant, Navigo, congés et jours de repos travaillés.</p>
       <form class="export-form-stacked" method="get" action="export_transport_docx.php">
         <label class="field"><span>Mois</span><input type="month" name="month" value="<?= h($month) ?>" required></label>
-        <button class="btn btn-primary" type="submit">Exporter</button>
+        <button class="btn btn-primary" type="submit">Exporter le Word RH</button>
       </form>
     </article>
   </div>

@@ -95,3 +95,7 @@ Les sauvegardes automatiques sont stockées dans :
 Le journal de connexions est stocké dans :
 
 - `storage/logs/login_journal.ndjson`
+
+### Jours de repos travaillés
+
+Chaque salarié déclare ses dates de repos effectivement travaillées (motif facultatif). Les déclarations sont prises en compte immédiatement, sans validation administrative. Le Word RH mensuel présente les dates, le nombre de jours par salarié et le total équipe, sans calcul de compensation. Le fichier de données `storage/data/rest_work.json` est créé à la première déclaration et utilise le mécanisme existant de sauvegardes. Les congés et les autres exports sont inchangés.

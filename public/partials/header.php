@@ -28,7 +28,7 @@ $navLink = static function (string $label, string $url, string $icon, bool $sele
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title><?= h($pageTitle) ?></title>
   <meta name="theme-color" content="<?= h($config['brand']['primary']) ?>">
-  <link rel="stylesheet" href="assets/css/styles.css?v=2bis">
+  <link rel="stylesheet" href="assets/css/styles.css?v=2bis-repos1">
 </head>
 <body class="<?= $user ? 'app-auth' : 'app-guest' ?>">
 <a class="skip-link" href="#main-content">Aller au contenu</a>
@@ -53,6 +53,7 @@ $navLink = static function (string $label, string $url, string $icon, bool $sele
             <?php $navLink('Notes de frais', $sectionUrl('notes-de-frais'), 'receipt'); ?>
             <?php $navLink('Titres-restaurant', $sectionUrl('titres-restaurant'), 'ticket'); ?>
             <?php $navLink('Navigo', $sectionUrl('navigo'), 'transport'); ?>
+            <?php $navLink('Jours de repos travaillés', $sectionUrl('jours-repos-travailles'), 'cal'); ?>
             <?php $navLink('Congés', $sectionUrl('conges'), 'cal'); ?>
           </div>
           <div class="nav-group"><p>Équipe</p><?php $navLink('Calendrier d’équipe', 'team_calendar.php', 'cal', $active === 'calendar'); ?></div>
