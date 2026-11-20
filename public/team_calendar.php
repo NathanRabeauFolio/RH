@@ -8,7 +8,7 @@ $pageTitle = app_config()['app_name'] . ' — Calendrier';
 $active = 'calendar';
 include __DIR__ . '/partials/header.php';
 ?>
-<section class="section-block">
+<section id="calendrier" class="section-block calendar-section">
   <div class="section-title"><h1>Calendrier d’équipe</h1></div>
   <div class="panel panel-tight">
     <?php include __DIR__ . '/partials/calendar_block.php'; ?>

@@ -18,3 +18,9 @@ jobs:
           find app public -name '*.php' -print0 | xargs -0 -n1 php -l
       - name: Validate health endpoint
         run: php public/health.php
+      - name: Verify RH employee configuration and calendar
+        run: php scripts/check_v2bis.php
+      - name: Validate deployment shell syntax and UI JavaScript
+        run: |
+          bash -n deploy/deploy_release.sh
+          node --check public/assets/js/app.js

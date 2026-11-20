@@ -23,41 +23,44 @@ jobs:
 
       - name: Build release archive
         run: |
-          tar             --exclude='.git'             --exclude='.github'             --exclude='storage/uploads/*'             --exclude='storage/submissions/*.json'             --exclude='docker'             --exclude='docs/screenshots'             -czf release.tar.gz .
+          tar --exclude='.git' --exclude='.github' --exclude='storage' --exclude='config.local.php' --exclude='docker' --exclude='docs/screenshots' -czf "$RUNNER_TEMP/release.tar.gz" .
 
       - name: Configure SSH
         env:
-          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY || secrets.LIGHTSAIL_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
+          test -n "$DEPLOY_SSH_PRIVATE_KEY" && test -n "$DEPLOY_KNOWN_HOSTS" || { echo "Missing SSH key or pinned known_hosts secret"; exit 1; }
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s
-' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          printf '%s
-' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Upload archive to Lightsail
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST || secrets.LIGHTSAIL_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || secrets.LIGHTSAIL_USER }}
         run: |
-          scp -P "$DEPLOY_PORT" release.tar.gz "$DEPLOY_USER@$DEPLOY_HOST:/tmp/mak-galerie-admin-tool-${GITHUB_SHA}.tar.gz"
+          scp -P "${DEPLOY_PORT:-22}" "$RUNNER_TEMP/release.tar.gz" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/mak-galerie-admin-tool-${GITHUB_SHA}.tar.gz"
 
       - name: Run remote deployment
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST || secrets.LIGHTSAIL_HOST }}
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER || secrets.LIGHTSAIL_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || secrets.LIGHTSAIL_APP_PATH }}
         run: |
-          ssh -p "$DEPLOY_PORT" "$DEPLOY_USER@$DEPLOY_HOST"             "APP_ROOT='$DEPLOY_PATH' RELEASE_ARCHIVE='/tmp/mak-galerie-admin-tool-${GITHUB_SHA}.tar.gz' RELEASE_SHA='${GITHUB_SHA}' bash -s"             < deploy/deploy_release.sh
+          ssh -p "${DEPLOY_PORT:-22}" "$DEPLOY_USER@$DEPLOY_HOST"             "APP_ROOT='$DEPLOY_PATH' RELEASE_ARCHIVE='/tmp/mak-galerie-admin-tool-${GITHUB_SHA}.tar.gz' RELEASE_SHA='${GITHUB_SHA}' bash -s"             < deploy/deploy_release.sh
 
       - name: Post-deploy health check
-        if: ${{ secrets.APP_HEALTHCHECK_URL != '' }}
         env:
           APP_HEALTHCHECK_URL: ${{ secrets.APP_HEALTHCHECK_URL }}
-        run: curl --fail --silent --show-error "$APP_HEALTHCHECK_URL"
+        run: |
+          if [ -n "$APP_HEALTHCHECK_URL" ]; then
+            curl --fail --silent --show-error "$APP_HEALTHCHECK_URL"
+          else
+            echo "Health check URL not configured; remote release verification completed."
+          fi
