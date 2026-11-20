@@ -33,7 +33,7 @@ git merge --ff-only "$target"
 verify_live() {
   local html health
   html="$(curl --fail --silent --show-error --max-time 15 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/")" || return 1
-  grep -Fq 'styles.css?v=2bis' <<<"$html" || return 1
+  grep -Fq 'styles.css?v=2bis-repos2' <<<"$html" || return 1
   grep -Fq 'data-user-id="laura"' <<<"$html" || return 1
   health="$(curl --fail --silent --show-error --max-time 15 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/health.php")" || return 1
   printf '%s' "$health" | php -r '$j=json_decode(stream_get_contents(STDIN), true); exit(($j["status"] ?? "") === "ok" && ($j["users"] ?? 0) === 6 && isset($j["files"]["rest_work"]) && is_int($j["files"]["rest_work"]) ? 0 : 1);'

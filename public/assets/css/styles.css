@@ -49,3 +49,6 @@
 @media(max-width:780px){.entry-grid.rest-work-row{grid-template-columns:1fr}.rest-work-remove{justify-self:start}.rest-work-actions button{margin:0;min-height:44px}.rest-work-history-head{gap:5px}}
 
 .export-description{color:var(--muted);font-size:13px}
+
+.rest-work-month{max-width:320px;margin-bottom:18px}.rest-work-month small{font-size:12px;color:var(--muted)}.edit-section .rest-work-month{margin-bottom:0}.rest-work-table td[data-label="Mois RH"]{white-space:nowrap}
+@media(max-width:780px){.rest-work-month{max-width:none}.rest-work-table td[data-label="Mois RH"]{white-space:normal}}
