@@ -61,6 +61,30 @@ grep -Fq 'V2bis edited' "$tmp/notes.xml"
 grep -Fq 'V2bis smoke B' "$tmp/notes.xml"
 grep -Fq 'TOTAL TTC' "$tmp/notes.xml"
 grep -Fq 'Inter' "$tmp/notes.xml"
+
+# Existing employee receipts must remain embedded in the Word export as real media.
+# Make a tiny PNG in disposable storage (the test never accesses production files).
+python3 - "$tmp/storage/uploads/receipt-smoke.png" <<'PY'
+import os, struct, sys, zlib
+path = sys.argv[1]
+os.makedirs(os.path.dirname(path), exist_ok=True)
+def chunk(tag, data):
+    return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xffffffff)
+pixel = b"\x00\x1f\x35\x61"
+png = (b"\x89PNG\r\n\x1a\n" +
+       chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)) +
+       chunk(b"IDAT", zlib.compress(pixel)) + chunk(b"IEND", b""))
+with open(path, "wb") as out:
+    out.write(png)
+PY
+php -r '$p=$argv[1];$r=json_decode(file_get_contents($p),true);$r[0]["attachments"]=[["path"=>"storage/uploads/receipt-smoke.png","original_name"=>"recu-demo.png"]];file_put_contents($p,json_encode($r));' "$tmp/storage/data/expenses.json"
+request "$url/export_notes_docx.php" -o "$tmp/notes-with-receipt.docx"
+unzip -tq "$tmp/notes-with-receipt.docx" >/dev/null
+unzip -Z1 "$tmp/notes-with-receipt.docx" | grep -Fq 'word/media/annexe_1_p1.png'
+unzip -p "$tmp/notes-with-receipt.docx" word/document.xml > "$tmp/notes-with-receipt.xml"
+grep -Fq 'Justificatif n° 01' "$tmp/notes-with-receipt.xml"
+grep -Fq 'recu-demo.png' "$tmp/notes-with-receipt.xml"
+
 request "$url/export_calendar_pdf.php?month=2026-11" -o "$tmp/calendar.pdf"
 head -c 5 "$tmp/calendar.pdf" | grep -Fq '%PDF-'
 grep -aFq '/MediaBox [0 0 842 595]' "$tmp/calendar.pdf"
