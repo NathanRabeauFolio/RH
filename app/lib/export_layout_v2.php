@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/helpers.php';
+// Loaded only through helpers.php to avoid circular inclusion.
 
 /**
  * Document-only layout functions inspired by the approved RH Figma V2.

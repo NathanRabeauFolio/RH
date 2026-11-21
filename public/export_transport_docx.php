@@ -1,6 +1,5 @@
 <?php
 require dirname(__DIR__) . '/app/lib/rest_work.php';
-require dirname(__DIR__) . '/app/lib/export_layout_v2.php';
 ensure_storage();
 $user = require_login('admin');
 $month = team_calendar_month((string) ($_GET['month'] ?? date('Y-m')));
