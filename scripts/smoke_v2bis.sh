@@ -176,9 +176,9 @@ admin_request "$url/export_transport_docx.php?month=2026-10" -o "$tmp/oct-moved.
 admin_request "$url/export_transport_docx.php?month=2026-11" -o "$tmp/nov-moved.docx"
 unzip -p "$tmp/oct-moved.docx" word/document.xml > "$tmp/oct-moved.xml"
 unzip -p "$tmp/nov-moved.docx" word/document.xml > "$tmp/nov-moved.xml"
-grep -Fq 'Samedi 24/10/2026' "$tmp/oct-moved.xml"
-if grep -Fq 'Samedi 24/10/2026' "$tmp/nov-moved.xml"; then exit 1; fi
-grep -Fq 'Lundi 26/10/2026' "$tmp/nov-moved.xml"
+grep -Fq 'Samedi 24 octobre 2026' "$tmp/oct-moved.xml"
+if grep -Fq 'Samedi 24 octobre 2026' "$tmp/nov-moved.xml"; then exit 1; fi
+grep -Fq 'Lundi 26 octobre 2026' "$tmp/nov-moved.xml"
 request -d action=delete -d "csrf=$token" -d "id=$rest_id" "$url/rest_work.php" > "$tmp/deleted_rest"
 grep -Fq 'Déclaration supprimée' "$tmp/deleted_rest"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===2?0:1);' "$rfile"
