@@ -1,5 +1,5 @@
 <?php
-require dirname(__DIR__) . '/app/lib/export_layout_v2.php';
+require dirname(__DIR__) . '/app/lib/helpers.php';
 ensure_storage();
 
 $user = require_login();
@@ -30,7 +30,6 @@ if ($hasNonPreview) {
     $notes[] = 'Les justificatifs non prévisualisables restent référencés dans les annexes, sans aperçu imprimé dans le document Word.';
 }
 $spec = [
-    'layout_v2' => 'expenses',
     'title' => 'Notes de frais',
     'subtitle' => $employee['name'] . ', le ' . date('d/m/Y'),
     'summary' => [

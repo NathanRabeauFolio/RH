@@ -64,24 +64,18 @@ function rh2_table(array $columns, array $rows, array $options = []): string
 
 function rh2_header(?string $logoRel): string
 {
-    $identity = [];
     if ($logoRel !== null) {
-        $identity[] = [
-            'paragraphs' => [
-                word_image_paragraph($logoRel, 'logo_mak.png', 480000, 480000, ['space_after' => 0, 'docpr_id' => 1]),
-            ], 'fill' => '#ffffff', 'padding' => ['top' => 0, 'bottom' => 0, 'left' => 0, 'right' => 0],
-        ];
+        $image = word_image_paragraph($logoRel, 'logo_mak.png', 480000, 480000,
+            ['space_after' => 70, 'docpr_id' => 1]);
+        $brand = word_text_run('   M.A.K. GALERIE', ['font' => 'Inter', 'size' => 20,
+            'color' => '#1f3561', 'bold' => true]);
+        $brand .= '<w:r><w:br/></w:r>';
+        $brand .= word_text_run('   DOCUMENT INTERNE', ['font' => 'Inter', 'size' => 14,
+            'color' => '#66758a']);
+        $xml = str_replace('</w:p>', $brand . '</w:p>', $image);
     } else {
-        $identity[] = ['paragraphs' => [rh2_p('M.A.K.', 22, '#1f3561', true)], 'fill' => '#ffffff'];
+        $xml = rh2_p('M.A.K. GALERIE', 20, '#1f3561', true);
     }
-    $identity[] = [
-        'paragraphs' => [
-            rh2_p('M.A.K. GALERIE', 19, '#1f3561', true, ['space_after' => 0]),
-            rh2_p('DOCUMENT INTERNE', 14, '#66758a', false, ['space_after' => 0]),
-        ],
-        'fill' => '#ffffff', 'padding' => ['top' => 10, 'bottom' => 10, 'left' => 0, 'right' => 0],
-    ];
-    $xml = rh2_table([880, 3450], [$identity], ['border' => '#ffffff']);
     $xml .= rh2_p('', 10, '#1f3561', false, [
         'border_bottom' => true, 'border_bottom_color' => '#1f3561',
         'space_after' => 400,
