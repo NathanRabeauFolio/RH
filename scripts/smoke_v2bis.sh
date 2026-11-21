@@ -54,8 +54,19 @@ request -d date=2026-11-18 --data-urlencode 'description=V2bis edited' -d amount
 grep -Fq 'V2bis edited' "$tmp/edited"
 request "$url/export_notes_docx.php" -o "$tmp/notes.docx"
 unzip -tq "$tmp/notes.docx" >/dev/null
+unzip -p "$tmp/notes.docx" word/document.xml > "$tmp/notes.xml"
+grep -Fq 'RÉCAPITULATIF INDIVIDUEL' "$tmp/notes.xml"
+grep -Fq 'DÉTAIL DES DÉPENSES' "$tmp/notes.xml"
+grep -Fq 'V2bis smoke A' "$tmp/notes.xml"
+grep -Fq 'V2bis smoke B' "$tmp/notes.xml"
+grep -Fq 'TOTAL TTC' "$tmp/notes.xml"
+grep -Fq 'Inter' "$tmp/notes.xml"
 request "$url/export_calendar_pdf.php?month=2026-11" -o "$tmp/calendar.pdf"
 head -c 5 "$tmp/calendar.pdf" | grep -Fq '%PDF-'
+grep -aFq '/MediaBox [0 0 842 595]' "$tmp/calendar.pdf"
+grep -aFq 'Calendrier de l' "$tmp/calendar.pdf"
+grep -aFq 'Novembre 2026' "$tmp/calendar.pdf"
+grep -aFq 'Decembre 2026' "$tmp/calendar.pdf"
 request "$url/export_notes_docx.php?employee=nathan-r" > "$tmp/refused"
 grep -Fq 'Accès refusé' "$tmp/refused"
 admin_id="$(php -r '$c=require $argv[1];echo $c["admin_id"];' "$tmp/app/config.default.php")"
@@ -121,27 +132,42 @@ def cells(row):
 for path, has_rest in zip(sys.argv[1:], [False, True, False]):
     root = ET.parse(path).getroot()
     tables = root.findall(".//w:tbl", ns)
-    assert len(tables) == 1, "Expected exactly one table in monthly RH Word"
+    assert len(tables) == 1, ("Only one data table (no layout tables)", path, len(tables))
     orient = root.find(".//w:pgSz", ns).get("{"+ns["w"]+"}orient")
     assert (orient == "landscape") == has_rest
     data = [cells(row) for row in tables[0].findall("./w:tr", ns)]
-    assert len(data[0]) == (7 if has_rest else 6), data
-    assert ("Jours de repos travaillés" in data[0]) == has_rest, data
+    assert len(data[0]) == (5 if has_rest else 4), data
+    assert ("REPOS TRAVAILLÉS" in data[0][-1]) == has_rest, data
     rows = {row[0]: row for row in data[1:]}
     assert len(rows) == 5, rows
     assert all(len(row) == len(data[0]) for row in rows.values()), rows
     assert "TOTAL REPOS TRAVAILLÉS" not in rows, rows
-    text = " ".join(t.text or "" for t in root.findall(".//w:t", ns))
-    assert "sans validation administrative" not in text
-    assert "Aucune compensation" not in text
-    assert "Total :" not in text
-    for value in ["Samedi 24/10/2026", "Motif corrigé", "Lundi 26/10/2026", "Montage exposition", "Dimanche 01/11/2026", "Autre"]:
-        assert (value in text) == has_rest, (value, text)
+    txt = " ".join(t.text or "" for t in root.findall(".//w:t", ns))
+    assert "SYNTHÈSE COLLABORATEURS" in txt, txt[:300]
+    assert "Déclarations RH" in txt
+    assert "sans validation administrative" not in txt
+    assert "Aucune compensation" not in txt
+    assert "Total :" not in txt
+    assert all(w in txt for w in ("TITRES-RESTAURANT", "CONGÉS POSÉS", "NAVIGO"))
+    assert all('titres' in row[1] for row in rows.values()), rows
+    for value in ["Samedi 24 octobre 2026", "Motif corrigé",
+                  "Lundi 26 octobre 2026", "Montage exposition",
+                  "Dimanche 1 novembre 2026", "Autre"]:
+        assert (value in txt) == has_rest, (value, path)
     if has_rest:
-        assert rows["Laura"][-1].splitlines() == ["3 jours", "Samedi 24/10/2026", "Motif corrigé", "Lundi 26/10/2026", "Montage exposition", "Dimanche 01/11/2026", "Autre"], rows
-        assert all(row[-1] == "—" for name, row in rows.items() if name != "Laura"), rows
-        assert "19" in rows["Laura"], rows
+        assert rows["Laura"][-1].splitlines() == [
+            "Samedi 24 octobre 2026", "Motif corrigé",
+            "Lundi 26 octobre 2026", "Montage exposition",
+            "Dimanche 1 novembre 2026", "Autre"
+        ], rows["Laura"]
+        assert all(row[-1] == "—" for name, row in rows.items() if name != "Laura")
+        assert "17 titres" in rows["Laura"][1], rows["Laura"]
+        assert "19 jours ouvrant droit" in rows["Laura"][1], rows["Laura"]
+        assert "2 retraits" in rows["Laura"][1], rows["Laura"]
+        assert "3 j" == rows["Laura"][2], rows["Laura"]
+    assert 'w:insideV' not in txt
 PY
+
 # Changing a report month moves the existing declaration, not a copy.
 request -d action=update -d "csrf=$token" -d "id=$rest_id" -d date=2026-10-24 -d report_month=2026-10 --data-urlencode 'reason=Motif corrigé' "$url/rest_work.php?id=$rest_id" > "$tmp/move"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);exit(count($r)===3&&$r[0]["report_month"]==="2026-10"?0:1);' "$rfile"
