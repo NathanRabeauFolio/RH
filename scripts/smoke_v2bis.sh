@@ -57,7 +57,7 @@ unzip -tq "$tmp/notes.docx" >/dev/null
 unzip -p "$tmp/notes.docx" word/document.xml > "$tmp/notes.xml"
 grep -Fq 'RÉCAPITULATIF INDIVIDUEL' "$tmp/notes.xml"
 grep -Fq 'DÉTAIL DES DÉPENSES' "$tmp/notes.xml"
-grep -Fq 'V2bis smoke A' "$tmp/notes.xml"
+grep -Fq 'V2bis edited' "$tmp/notes.xml"
 grep -Fq 'V2bis smoke B' "$tmp/notes.xml"
 grep -Fq 'TOTAL TTC' "$tmp/notes.xml"
 grep -Fq 'Inter' "$tmp/notes.xml"
@@ -165,7 +165,8 @@ for path, has_rest in zip(sys.argv[1:], [False, True, False]):
         assert "19 jours ouvrant droit" in rows["Laura"][1], rows["Laura"]
         assert "2 retraits" in rows["Laura"][1], rows["Laura"]
         assert "3 j" == rows["Laura"][2], rows["Laura"]
-    assert 'w:insideV' not in txt
+    vertical_lines = root.findall(".//w:insideV", ns)
+    assert all(n.get("{"+ns["w"]+"}val") == "nil" for n in vertical_lines), vertical_lines
 PY
 
 # Changing a report month moves the existing declaration, not a copy.
