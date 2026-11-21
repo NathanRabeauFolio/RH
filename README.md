@@ -99,3 +99,13 @@ Le journal de connexions est stocké dans :
 ### Jours de repos travaillés
 
 Chaque salarié déclare ses dates de repos effectivement travaillées (motif facultatif). Les déclarations sont prises en compte immédiatement, sans validation administrative. Le mois RH de rattachement est distinct de la date travaillée (par défaut le mois courant). Les déclarations tardives figurent uniquement dans ce mois, avec leur date réelle et leur motif. Le Word RH mensuel réunit les données dans un seul tableau. La colonne des repos travaillés ne figure que pour les mois ayant au moins une déclaration rattachée ; elle contient le nombre de jours par salarié, les dates et motifs, sans total collectif. Format A4 paysage si la colonne est présente, portrait sinon. Les exports sont reproductibles, sans report automatique sur le mois suivant. Le fichier de données `storage/data/rest_work.json` est créé à la première déclaration et utilise le mécanisme existant de sauvegardes. Les congés et les autres exports sont inchangés.
+
+## Exports documentaires V2 — 21/11/2026
+
+Les trois exports réels reprennent la direction Figma `ongD6wHzbulLzaIpof8AIA` (planche V2 `16:2`), sans modifier les données ni les règles métier :
+
+- **Notes de frais (DOCX)** : total TTC dominant, HT et nombre de dépenses secondaires ; descriptif puis date, montants et renvois aux justificatifs ; annexes d'origine conservées.
+- **Déclarations RH mensuelles (DOCX)** : une seule grille, 4 colonnes en portrait sans repos travaillé et 5 colonnes en paysage dans les mois RH concernés ; titres restants en évidence, droits et retraits en sous-ligne, dates travaillées suivies de leurs motifs. Aucun total collectif ni report automatique sur les mois suivants.
+- **Calendrier d'équipe (PDF)** : une page A4 paysage, deux mois consécutifs, grille légère, jours fériés distincts, couleur par collaborateur et statut de congé conservé.
+
+Les présentations Word utilisent la police Inter lorsqu'elle est installée chez le destinataire ; Word peut lui substituer une police sinon. Le PDF garde ses polices standard Helvetica intégrées. Les données de démonstration présentes dans Figma ne sont jamais injectées dans les exports.

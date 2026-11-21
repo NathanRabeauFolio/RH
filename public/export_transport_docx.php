@@ -1,10 +1,13 @@
 <?php
 require dirname(__DIR__) . '/app/lib/rest_work.php';
+require dirname(__DIR__) . '/app/lib/export_layout_v2.php';
 ensure_storage();
 $user = require_login('admin');
 $month = team_calendar_month((string) ($_GET['month'] ?? date('Y-m')));
 $table = monthly_hr_table($month);
 $spec = [
+    'layout_v2' => 'monthly',
+    'month' => $month,
     'title' => 'Déclarations RH mensuelles',
     'subtitle' => month_label_fr($month) . ' · Export du ' . date('d/m/Y'),
     'landscape' => $table['has_rest_work'],
