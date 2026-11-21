@@ -1796,6 +1796,10 @@ function docx_document(array $spec): string
     }
 
     $body = '';
+    $v2Layout = (string) ($spec['layout_v2'] ?? (($spec['title'] ?? '') === 'Notes de frais' ? 'expenses' : ''));
+    if ($v2Layout !== '' && function_exists('rh2_docx_body')) {
+        $body = rh2_docx_body(array_replace($spec, ['layout_v2' => $v2Layout]), $logoRel);
+    } else {
     if ($logoRel !== null) {
         $body .= word_image_paragraph($logoRel, 'logo_mak.png', 792000, 792000, ['space_after' => 120, 'docpr_id' => 1]);
     } else {
@@ -1956,6 +1960,8 @@ function docx_document(array $spec): string
         $body .= word_single_paragraph((string) $section['note'], ['size' => 18, 'color' => '#666666']);
     }
 
+    }
+
     if ($appendices !== []) {
         [$usableWidthEmu, $usableHeightEmu] = docx_page_content_box_emu();
         $imageMaxWidthEmu = $usableWidthEmu;
@@ -1975,6 +1981,9 @@ function docx_document(array $spec): string
 
                     $body .= word_page_break_paragraph();
 
+                    if ($v2Layout === 'expenses' && function_exists('rh2_appendix_header')) {
+                        $body .= rh2_appendix_header($appendix, $idx);
+                    } else {
                     $body .= word_single_paragraph((string) ($appendix['title'] ?? ('Annexe ' . ($idx + 1))), [
                         'size' => 18,
                         'color' => '#' . $ink,
@@ -1988,6 +1997,7 @@ function docx_document(array $spec): string
                         'space_after' => $sourceType === 'pdf' && $pageTotal > 1 ? 16 : 40,
                         'keep_next' => true,
                     ]);
+                    }
 
                     if ($sourceType === 'pdf' && $pageTotal > 1) {
                         $body .= word_single_paragraph('Page ' . ($pageIndex + 1) . ' / ' . $pageTotal, [
@@ -2021,6 +2031,9 @@ function docx_document(array $spec): string
             } else {
                 $body .= word_page_break_paragraph();
 
+                if ($v2Layout === 'expenses' && function_exists('rh2_appendix_header')) {
+                    $body .= rh2_appendix_header($appendix, $idx);
+                } else {
                 $body .= word_single_paragraph((string) ($appendix['title'] ?? ('Annexe ' . ($idx + 1))), [
                     'size' => 18,
                     'color' => '#' . $ink,
@@ -2032,6 +2045,7 @@ function docx_document(array $spec): string
                     'color' => '#666666',
                     'space_after' => 80,
                 ]);
+                }
 
                 $body .= word_single_paragraph(
                     $sourceType === 'pdf'
@@ -2287,3 +2301,5 @@ function response_pdf(string $filename, string $title, string $month): never
     echo $binary;
     exit;
 }
+// Load optional document renderers after the legacy helpers so live note-export overrides remain intact.
+require_once __DIR__ . '/export_layout_v2.php';
